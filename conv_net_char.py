@@ -14,7 +14,10 @@ import warnings
 import sys
 import time
 import string
+from CharConvPoolLayer import *
+
 warnings.filterwarnings("ignore")  
+
 #different non-linearities
 def ReLU(x):
     y = T.maximum(0.0, x)
@@ -71,6 +74,40 @@ def train_conv_net(datasets,U,conv_non_linear,len_word_dict,len_char_dict):
     filter_shape = get_filter_shape(len_word_dict,len_char_dict)
     conv_layer = CharConvPoolLayer(rng,datasets[0],filter_shape,non_linear=conv_non_linear)
 
+    # get cost
+    """
+    # probability that target = 1
+    prediction = p_1 > 0.5 # the prediction threshold
+    """
+
+    # cost function
+    """
+    xent = -y * T.log(p_1) - (1-y) * T.log(1-p_1)
+    cost = xent.mean() + 0.01 * (w_1**2).sum()
+    gw_1, gb_1, gw_2, gb_2 = T.grad(cost,[w_1,b_1,w_2,b_2])
+    """
+
+
+    # prediction function
+    """
+    predict = theano.function(inputs = [x], outputs = prediction)
+    """
+
+
+    # training function
+    """
+    train = theano.function(
+                        inputs = [x,y], 
+                        outputs = [prediction, xent],
+                        updates = {w_1 : w_1-0.1*gw_1, b_1 : b_1-0.1*gb_1,
+                                    w_2 : w_2-0.1*gw_2, b_2 : b_2-0.1*gb_2})
+
+    """
+
+
+
+    # training
+
 def shared_dataset(data_xy, borrow=True):
     """ Function that loads the dataset into shared variables
 
@@ -88,6 +125,7 @@ def shared_dataset(data_xy, borrow=True):
                                         dtype=theano.config.floatX),
                                         borrow=borrow)
     return shared_x, T.cast(shared_y, 'int32')
+
 def sgd_updates_adadelta(params,cost,rho=0.95,epsilon=1e-6,norm_lim=9,word_vec_name='Words'):
     """
     adadelta update rule, mostly from
@@ -119,6 +157,7 @@ def sgd_updates_adadelta(params,cost,rho=0.95,epsilon=1e-6,norm_lim=9,word_vec_n
         else:
             updates[param] = stepped_param      
     return updates 
+
 def get_char_idx_map():
     """
     Initialize char_idx_map, 100 chars in total
@@ -137,6 +176,7 @@ def get_char_idx_map():
         char_idx_map[char] = i
         i += 1
     return char_idx_map
+
 def get_char_idx_from_sent(sent, char_idx_map, window_size=2):
     """
     Transforms sentence into a windows of list indices. Pad with zeroes.
@@ -149,6 +189,7 @@ def get_char_idx_from_sent(sent, char_idx_map, window_size=2):
                 char_indices_in_window.append(char_idx_map[char])
         x.append( char_indices_in_window )
     return x
+
 def get_idx_from_sent(sent, word_idx_map):
     """
     Transforms sentence into a list of indices. 
@@ -161,6 +202,7 @@ def get_idx_from_sent(sent, word_idx_map):
         else:
             x.append(0)
     return x
+
 def make_idx_data_cv(revs, word_idx_map, cv, word_window_len=3, char_window_len=2):
     """
     Transforms sentences into matrices.
@@ -188,6 +230,7 @@ def make_idx_data_cv(revs, word_idx_map, cv, word_window_len=3, char_window_len=
         else:  
             train.append(sent_embeddings)   
     return [train, test], len_char_dict
+
 if __name__=="__main__":
     print "loading data...",
     x = cPickle.load(open("mr.p","rb"))
