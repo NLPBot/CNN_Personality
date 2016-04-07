@@ -5,6 +5,8 @@ import theano.tensor as T
 from theano.tensor.signal import downsample
 from theano.tensor.nnet import conv
 
+theano.config.compute_test_value = 'warn'
+
 class CharConvPoolLayer(object):
     """ Layer of a convolutional and pooling network """
     def __init__(self, rng, input, filter_shape, non_linear="tanh"):
@@ -36,33 +38,27 @@ class CharConvPoolLayer(object):
         self.V_chr = filter_shape[7] # len_char_dict
 
         # initialize weights with random values
-        self.W0 = theano.shared(rng.randn(self.cl_u_0,self.d_chr*self.k_chr), 
-        										dtype=theano.config.floatX, name='W0')
-        self.W1 = theano.shared((rng.randn(self.cl_u_1,(self.d_wrd+self.cl_u_0)*self.k_wrd), 
-                                                dtype=theano.config.floatX, name='W1')
-        self.W_wrd = theano.shared((rng.randn(self.d_wrd,self.V_wrd), 
-                                                dtype=theano.config.floatX, name='W_wrd')
-        self.W_chr = theano.shared((rng.randn(self.d_chr,self.V_chr), 
-                                                dtype=theano.config.floatX, name='W_chr')
+        self.W0 = theano.shared(rng.randn(self.cl_u_0,self.d_chr*self.k_chr), name='W0')
+        self.W1 = theano.shared(rng.randn(self.cl_u_1,(self.d_wrd+self.cl_u_0)*self.k_wrd), name='W1')
+        self.W_wrd = theano.shared(rng.randn(self.V_wrd,self.d_wrd), name='W_wrd')
+        self.W_chr = theano.shared(rng.randn(self.V_chr,self.d_chr), name='W_chr')
         # initialize biases with random values
-        self.b0  = theano.shared((self.cl_u_0,), dtype=theano.config.floatX, name='b0')
+        self.b0  = theano.shared(rng.randn(self.cl_u_0,), name='b0')
+        self.b1 = theano.shared(rng.randn(self.cl_u_1,), name='b1')
 
-        self.b1 = theano.shared((self.cl_u_1,), dtype=theano.config.floatX, name='b1')
+        print('shape of W0 ' + str(self.W0.shape.eval() ) )
+        print('shape of W1 ' + str(self.W1.shape.eval()) )
+        print('shape of W_wrd ' + str(self.W_wrd.shape.eval()) )
+        print('shape of W_chr ' + str(self.W_chr.shape.eval()) )
+        print('shape of b0 ' + str(self.b0.shape.eval()) )
+        print('shape of b1 ' + str(self.b1.shape.eval()) )
 
-"""
-        print('shape of W0 ' + str(self.W0.shape) )
-        print('shape of W1 ' + str(self.W1.shape) )
-        print('shape of W_wrd ' + str(self.W_wrd.shape) )
-        print('shape of W_chr ' + str(self.W_chr.shape) )
-        print('shape of b0 ' + str(self.b0.shape) )
-        print('shape of b1 ' + str(self.b1.shape) )
-"""
         # convolve input feature maps with multiple filters
-        self.max_r_blog_list = []
+        self.max_r_sent_list = []
         for sent in input:
             r_sent_list = [ self.compute_r_sent(word_windows) for word_windows in sent ]
-            max_r_blog = r_sent_list[0] # find max
-            self.max_r_blog_list.append( max_r_blog )
+            max_r_sent = r_sent_list[0] # find max
+            self.max_r_sent_list.append( max_r_sent )
 
     def get_one_hot_vec(self,v_values,dim):
         one_hot = np.zeros(dim) 
@@ -77,11 +73,16 @@ class CharConvPoolLayer(object):
 
         # v_c = theano.shared(char_window[i])
         # r_chr = T.dot(self.W_chr,v_c)
-        z_m, updates = theano.scan(lambda i,z_m,W_chr,char_window: T.concatenate([z_m,T.dot(self.W_chr, \
-        				theano.shared(self.get_one_hot_vec(char_window[i],self.V_chr)) )],axis=0),
-        							sequences=i,
-        							non_sequences=[z_m,W_chr,char_window])
+        #T.dot(self.W_chr, theano.shared(self.get_one_hot_vec(char,self.V_chr)) )
+        z_m_list = [ self.W_chr[char] for char in char_window ]
+        z_m = T.concatenate( [z_m_list], axis=0 )
+
         # append to list
+        """
+        self.print_dim('self.W0',self.W0)
+        self.print_dim('z_m',z_m)
+        self.print_dim('T.dot(z_m,self.W0)',T.dot(z_m,self.W0))
+        """
         r_wch = T.dot(self.W0,z_m) + self.b0 
         return r_wch # return first for now
 
@@ -90,24 +91,44 @@ class CharConvPoolLayer(object):
     	# get params
     	(v_w_values,char_windows) = word_window 
 
-	    # initialize v_w
-	    v_w = theano.shared(self.get_one_hot_vec(v_w_values,self.V_wrd))
+        # initialize v_w
+        #v_w = theano.shared(self.get_one_hot_vec(v_w_values,self.V_wrd))
 
-	    # weight * one-hot
-	    r_wrd = T.dot(self.W_wrd,v_w)
-	    r_wch_list = [ self.compute_r_wch(char_window) for char_window in char_windows ]
-	    r_wch = r_wch_list[0] # find max
+        # weight * one-hot
+        #r_wrd = T.dot(self.W_wrd,v_w)
+        r_wrd = self.W_wrd[v_w_values]
+        r_wch_list = [ self.compute_r_wch(char_window) for char_window in char_windows ]
+        r_wch = r_wch_list[0] # find max
 
-	    # concatenate embeddings (word + char) 
-	    u_n = T.concatenate([r_wrd,r_wch],axis=0) 
-	    return u_n
+        # concatenate embeddings (word + char) 
+        """
+        self.print_dim('r_wrd',r_wrd)
+        self.print_dim('r_wch',r_wch)
+        """
+        #self.print_dim('r_wch[0]',r_wch[0])
+        u_n = T.concatenate([r_wrd.T,r_wch],axis=0) 
+
+        #self.print_dim('u_n',u_n)
+
+        return [r_wrd.T,r_wch]
 
     def compute_r_sent(self,word_windows):
 
-        z_n = fvector('z_n')
-        z_n, updates = theano.scan(lambda i,z_n,word_windows: T.concatenate([z_n,get_u_n(word_windows[i])],axis=0),
-        							sequences=i,
-        							non_sequences=[z_n,word_windows])
-
-        r_sent = T.dot(self.W1,z_n) + self.b1
+        z_n = T.fvector('z_n')
+        z_n_list = []
+        word_windows_list = [ z_n_list.extend(self.get_u_n(word_window)) for word_window in word_windows ]
+        z_n = T.concatenate( z_n_list, axis=0 )
+        """
+        self.print_dim('self.W1',self.W1)
+        self.print_dim('z_n',z_n)
+        self.print_val('z_n',z_n)
+        """
+        r_sent = T.dot(self.W1,z_n) + self.b1 
+        self.print_val('r_sent',r_sent)
         return r_sent
+
+    def print_dim(self,name,val):
+    	print( name + ' ' + str(val.shape.eval()) )
+
+    def print_val(self,name,val):
+    	print( name + ' ' + str(val.eval()) )

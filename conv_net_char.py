@@ -37,21 +37,21 @@ def get_filter_shape(len_word_dict,len_char_dict):
         self.cl_u_0 = filter_shape[0] # set by us = 1
         self.cl_u_1 = filter_shape[1] # set by us = 1
 
-        self.k_chr = filter_shape[2] # 2
-        self.k_wrd = filter_shape[3] # 3
+        self.k_chr = filter_shape[2] # 1
+        self.k_wrd = filter_shape[3] # 2
 
-        self.V_wrd = filter_shape[4] # set by us = 1
-        self.V_chr = filter_shape[5] # set by us = 1
+        self.d_wrd = filter_shape[4] # 2 
+        self.d_chr = filter_shape[5] # 1
 
-        self.d_wrd = filter_shape[6] # len_word_dict
-        self.d_chr = filter_shape[7] # len_char_dict
+        self.V_wrd = filter_shape[6] # len_word_dict
+        self.V_chr = filter_shape[7] # len_char_dict
 
     """
     filter_shape = [1]*8
     filter_shape[0] = 1 # set by us = 1
     filter_shape[1] = 1 # set by us = 1
-    filter_shape[2] = 1 # set by us = 1
-    filter_shape[3] = 2 # 2
+    filter_shape[2] = 2 # set by us = 2
+    filter_shape[3] = 3 # 3
     filter_shape[4] = 2 # set by us = 2
     filter_shape[5] = 1 # set by us = 1
     filter_shape[6] = len_word_dict # len_word_dict
@@ -73,6 +73,9 @@ def train_conv_net(datasets,U,conv_non_linear,len_word_dict,len_char_dict):
     # parameters: rng, input, filter_shape, non_linear="tanh"
     filter_shape = get_filter_shape(len_word_dict,len_char_dict)
     conv_layer = CharConvPoolLayer(rng,datasets[0],filter_shape,non_linear=conv_non_linear)
+
+    #for r_sent in conv_layer.max_r_sent_list:
+
 
     # get cost
     """
@@ -238,7 +241,7 @@ if __name__=="__main__":
     print "data loaded!"  
     print "model architecture: CNN-static"
     non_static=False
-    execfile("conv_net_classes.py")    
+    execfile("CharConvPoolLayer.py")    
     print "using: word2vec vectors" 
     U = W
     results = []
